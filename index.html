@@ -18,7 +18,7 @@
 		let date = addDays(new Date(), 6 - new Date().getDay() - 1);
 		let count = 0;
 
-        let t_data = card.checkItems.filter(m => m.state != 'complete').map(m => m.name).map(m => ({ name: m, date: toString(addDays(date, 7 * (count++))) }));
+        let t_data = card.checkItems.filter(m => m.state != 'complete').sort(m => m.pos).map(m => m.name).map(m => ({ name: m, date: toString(addDays(date, 7 * (count++))) }));
 		
 		let first = t_data[0];
         let t_name = first.name;
