@@ -296,7 +296,7 @@
     }
 
     #arrows {
-      
+
       /* width: 90%;
       left: 5%; */
     }
@@ -325,12 +325,20 @@
       right: 5%;
     }
 
-    [data-is-first=true] #arrows .left {
+    [data-is-first=true] .left {
       display: none;
     }
 
-    [data-is-last=true] #arrows .right {
+    [data-is-last=true] .right {
       display: none;
+    }
+
+    legend {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 24px;
     }
   </style>
 
@@ -447,6 +455,11 @@
         </div>
       </section> -->
 
+      <legend>
+        <span class="left">←</span>
+        Podes scrollear para los costados
+        <span class="right">→</span>
+      </legend>
     </main>
   </div>
 
