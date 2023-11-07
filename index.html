@@ -53,13 +53,20 @@
     const pageRepository = new PageRepository();
 
     $(function () {
-      const view = document.querySelector('#swipe_view');
+      configurateData();
+      configuratePages()
+    });
 
+    function configurateData() {
       // Setea los valores para la página de facturas
       setPlaceholderData(trelloCardId, '.facturas');
 
       // Setea los valores para la página de guardia
       setPlaceholderData(trelloCardGuardiaId, '.guardia', 2, d => 'Hasta el ' + d);
+    }
+
+    function configuratePages() {
+      const view = document.querySelector('#swipe_view');
 
       // Cuando se cambie la página, agrega valores auxiliares para los estilos
       pageRepository.addInterceptor('changePage', 'after', (page) => {
@@ -79,9 +86,27 @@
       onPageChanged(view, (page) =>
         pageRepository.changePage(page))
 
-      // Cambia a la página especificada
-      toPage(view, pageRepository.getPage());
-    });
+      onHashUrl(data => {
+        let page = pageRepository.getPage();
+
+        let urlPage = data.find(m => m.prop == 'page');
+        if (urlPage) {
+          console.log('url page:', urlPage.value)
+          let pageNumber = $(`[data-page=${urlPage.value}]`).data('page-number');
+          console.log('url page number:', pageNumber)
+          page = Number(pageNumber);
+        };
+
+        // Cambia a la página especificada
+        toPage(view, page);
+      })
+    }
+
+    function onHashUrl(func) {
+      let data = location.hash.substring(1).split('&').map(m => ({ prop: m.split('=')[0], value: m.split('=')[1] })).filter(m => !!m.value);
+
+      func(data);
+    }
 
     function onPageChanged(view, func) {
       view.onscrollend = (e) => {
@@ -151,7 +176,6 @@
 <body>
   <style>
     body {
-      /*font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";*/
       font-size: 14px;
       color: #fff;
       box-sizing: border-box;
@@ -177,28 +201,11 @@
     a:hover {
       color: #125699;
     }
-  </style>
 
-  <style>
-    /* You can add global styles to this file, and also import other style files */
     body {
-      /*background-image: url('facturas/assets/facturas.jpg');
-  background-size: cover;*/
       font-family: Bakery;
       margin: 0;
     }
-
-    /* .background {
-      content: "";
-      background-size: cover;
-      background-position: center;
-      width: 100%;
-      height: 100%;
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: -100;
-    } */
 
     .background:after {
       position: absolute;
@@ -224,7 +231,6 @@
 
     h1 {
       font-size: 5em;
-      /* margin-bottom: 0; */
       margin: 0;
     }
 
@@ -236,15 +242,9 @@
       font-size: 3em;
       color: white;
       margin: 0;
-      /* margin-top: -10px; */
     }
 
     .who {
-      /* text-align: center; */
-      /* width: 17em;
-      height: 17em;
-      position: absolute;
-      top: calc(50% - 8em); */
       background: rgba(0, 0, 0, .3);
     }
 
@@ -261,14 +261,11 @@
     .mobile {
       width: 100%;
       height: 100vh;
-      /* max-width: 380px; */
       margin: 0 auto;
-      /* background: #f9fbfc; */
       position: relative;
       display: flex;
       flex-direction: column;
       text-align: center;
-      /* align-items: center; */
     }
 
     .swipe-view {
@@ -283,7 +280,6 @@
     }
 
     .swipe-view section {
-      /* width: 380px; */
       height: 100%;
       flex: 0 0 100%;
       scroll-snap-align: start;
@@ -299,10 +295,14 @@
     }
 
     #arrows {
+      
+      /* width: 90%;
+      left: 5%; */
+    }
+
+    #arrows .arrow {
       position: fixed;
-      width: 90%;
       top: 30%;
-      left: 5%;
       z-index: 9999;
     }
 
@@ -316,11 +316,12 @@
     }
 
     #arrows .left {
-      float: left;
+      /* float: left; */
+      left: 5%;
     }
 
     #arrows .right {
-      float: right;
+      right: 5%;
     }
 
     [data-is-first=true] #arrows .left {
@@ -343,7 +344,7 @@
             src="https://d29fhpw069ctt2.cloudfront.net/icon/image/39041/preview.png" /></span>
       </div>
 
-      <section class="facturas background">
+      <section class="facturas background" data-page="facturas" data-page-number="1">
         <div class="title">
           <!-- Resources -->
           <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Capa_1"
@@ -415,7 +416,7 @@
         </div>
       </section>
 
-      <section class="guardia background">
+      <section class="guardia background" data-page="guardia" data-page-number="2">
         <div class="title">
           <img src="https://cdn-icons-png.flaticon.com/512/308/308045.png" alt="gorra" height="101.678" />
           <h2 style="text-align: center">
