@@ -12,26 +12,31 @@
     let key = "14ce07b3203f16ca21f9de6965e3b577";
     // let trelloCardId = "NWU0MTY5ZTc0NjNhYmIxNmY5NGUyYjYz";
     let trelloCardId = "NjU0M2YxZGIzZWE5NzA5NmU5NTNmY2Zk";
+    let trelloCardGuardiaId = 'NjU0YTRmNjkxMWM2NjhmYmQ1ZDEyZDFj';
     // let token = "ZmUxNjNhMjQ4ZTBhZjA3ZWM0MDcxNWUwMWY0YzNkOWMwNWE5NmRkNjhiYzUwOWQwMzNmNmFmYjUzM2ZiMGE1NQ==";
     let token = "QVRUQTQxM2MwM2Y2OTQ4NjQwYzNiZjMzNzVmMWJhODc2NTk5MWM5ZWNjMjI5NjZmZDEwZjRiNjVkOWNmMjVhOWMxNjcwNzkzREQ5OA==";
-    let urlCard = `https://api.trello.com/1/cards/${atob(trelloCardId)}/checklists?key=${key}&token=${atob(token)}`;
 
-    $.get(urlCard, function (data) {
-      let card = data[0];
+    function setPlaceholderData(id, placeholder, extra, mapper) {
+      mapper = mapper || (m => m);
+      let urlCard = `https://api.trello.com/1/cards/${atob(id)}/checklists?key=${key}&token=${atob(token)}`;
 
-      let date = addDays(new Date(), 6 - new Date().getDay() - 1);
-      let count = 0;
+      $.get(urlCard, function (data) {
+        let card = data[0];
 
-      let t_data = card.checkItems.filter(m => m.state != 'complete').sort((m, n) => m.pos - n.pos).map(m => m.name).map(m => ({ name: m, date: toString(addDays(date, 7 * (count++))) }));
+        let date = addDays(new Date(), 6 - new Date().getDay() - 1 + (extra || 0));
+        let count = 0;
 
-      let first = t_data[0];
-      let t_name = first.name;
-      let t_date = first.date;
+        let t_data = card.checkItems.filter(m => m.state != 'complete').sort((m, n) => m.pos - n.pos).map(m => m.name).map(m => ({ name: m, date: toString(addDays(date, 7 * (count++))) }));
 
-      $('#t_who').removeClass('waiting');
-      $('#t_name').text(t_name);
-      $('#t_date').text(t_date);
-    })
+        let first = t_data[0];
+        let t_name = first.name;
+        let t_date = first.date;
+
+        $('.who', placeholder).removeClass('waiting');
+        $('.t_name', placeholder).text(t_name);
+        $('.t_date', placeholder).text(mapper(t_date));
+      })
+    }
 
     function addDays(date, days) {
       return new Date(new Date(date).setDate(date.getDate() + days))
@@ -41,26 +46,103 @@
       return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`
     }
 
-    function toPage(page) {
-      let view = document.querySelector('.swipe-view');
+    function toPage(view, page) {
       view.scrollTo(view.clientWidth * (page - 1), 0);
     }
 
-    onload = function () {
-      let currentPage = (function () {
-        let page = Number(localStorage.getItem('current_page') || 0);
+    const pageRepository = new PageRepository();
 
-        return page;
-      })()
+    $(function () {
+      const view = document.querySelector('#swipe_view');
 
-      toPage(currentPage);
+      // Setea los valores para la página de facturas
+      setPlaceholderData(trelloCardId, '.facturas');
 
-      let view = document.querySelector('.swipe-view');
+      // Setea los valores para la página de guardia
+      setPlaceholderData(trelloCardGuardiaId, '.guardia', 2, d => 'Hasta el ' + d);
+
+      // Cuando se cambie la página, agrega valores auxiliares para los estilos
+      pageRepository.addInterceptor('changePage', 'after', (page) => {
+        let total = Math.ceil(view.scrollWidth / view.clientWidth);
+        $(view)
+          .attr('data-page', page)
+          .attr('data-total-pages', total)
+          .attr('data-is-first', page == 1)
+          .attr('data-is-last', page == total);
+      });
+
+      // Se ejecuta cuando se de click a las flechas
+      onArrowChanged(view, (direction) =>
+        toPage(view, pageRepository.getPage() + (direction == 'left' ? -1 : 1)))
+
+      // Se ejecuta durante el scroll de la pantalla
+      onPageChanged(view, (page) =>
+        pageRepository.changePage(page))
+
+      // Cambia a la página especificada
+      toPage(view, pageRepository.getPage());
+    });
+
+    function onPageChanged(view, func) {
       view.onscrollend = (e) => {
         let page = Math.ceil(view.scrollLeft / view.clientWidth) + 1;
-        console.log(page, view.scrollLeft, view.clientWidth);
-        localStorage.setItem('current_page', page);
+        console.log('page:', page, 'left:', view.scrollLeft, 'width:', view.clientWidth);
+
+        func(page);
       }
+    }
+
+    function onArrowChanged(view, func) {
+      $('.arrow', view).on('click', function (e) {
+        const direction = $(this).data('direction');
+
+        func(direction);
+      });
+    }
+
+    function PageRepository() {
+      const $this = this;
+      $this.interceptors = [];
+
+      $this.changePage = (page) => {
+        excecProcess(
+          'changePage',
+          () => {
+            localStorage.setItem('current_page', page);
+            return page;
+          },
+          page)
+      }
+
+      $this.getPage = () => {
+        return excecProcess('getPage', () => Number(localStorage.getItem('current_page') || 0))
+      }
+
+      $this.addInterceptor = (process, type, func) => {
+        $this.interceptors.push(new Interceptor(process, type, func));
+      }
+
+      function excecProcess(process, func, ...paramArguments) {
+        getInterceptors(process, 'before').forEach(m => m.excec(paramArguments));
+
+        let result = func();
+
+        getInterceptors(process, 'after').forEach(m => m.excec(result));
+
+        return result;
+      }
+
+      function getInterceptors(process, type) {
+        return $this.interceptors.filter(m => m.process == process && (!type || m.type == type));
+      }
+    }
+
+    function Interceptor(process, type, func) {
+      this.process = process;
+      this.type = type;
+      this.func = func;
+
+      this.excec = (...args) => func(...args);
     }
 
   </script>
@@ -215,11 +297,52 @@
       top: calc(50% - 60px);
       width: 100%;
     }
+
+    #arrows {
+      position: fixed;
+      width: 90%;
+      top: 30%;
+      left: 5%;
+      z-index: 9999;
+    }
+
+    #arrows img {
+      height: 45px;
+      opacity: .6;
+    }
+
+    #arrows img:hover {
+      cursor: pointer;
+    }
+
+    #arrows .left {
+      float: left;
+    }
+
+    #arrows .right {
+      float: right;
+    }
+
+    [data-is-first=true] #arrows .left {
+      display: none;
+    }
+
+    [data-is-last=true] #arrows .right {
+      display: none;
+    }
   </style>
 
   <div class="mobile" role="main">
 
-    <main class="swipe-view">
+    <main class="swipe-view" id="swipe_view">
+
+      <div id="arrows">
+        <span class="left arrow" data-direction="left"><img
+            src="https://d29fhpw069ctt2.cloudfront.net/icon/image/39040/preview.png" /></span>
+        <span class="right arrow" data-direction="right"><img
+            src="https://d29fhpw069ctt2.cloudfront.net/icon/image/39041/preview.png" /></span>
+      </div>
+
       <section class="facturas background">
         <div class="title">
           <!-- Resources -->
@@ -285,9 +408,9 @@
           </h2>
         </div>
         <div class="content">
-          <div class="who waiting" id="t_who">
-            <h1 id="t_name"></h1>
-            <p id="t_date"></p>
+          <div class="who waiting">
+            <h1 class="t_name"></h1>
+            <p class="t_date"></p>
           </div>
         </div>
       </section>
@@ -296,13 +419,13 @@
         <div class="title">
           <img src="https://cdn-icons-png.flaticon.com/512/308/308045.png" alt="gorra" height="101.678" />
           <h2 style="text-align: center">
-            Quién esta de guardia?
+            Quién esta de guardia (GIN)?
           </h2>
         </div>
         <div class="content">
-          <div class="who" id="t_who">
-            <h1 id="t_name">No Tucu</h1>
-            <p id="t_date">10/11/2023</p>
+          <div class="who">
+            <h1 class="t_name">No Tucu</h1>
+            <p class="t_date">Hasta el 10/11/2023</p>
           </div>
         </div>
       </section>
@@ -315,14 +438,16 @@
           </h2>
         </div>
         <div class="content">
-          <div class="who" id="t_who">
-            <h1 id="t_name">No Tucu</h1>
-            <p id="t_date">10/11/2023</p>
+          <div class="who">
+            <h1 class="t_name">No Tucu</h1>
+            <p class="t_date">10/11/2023</p>
           </div>
         </div>
       </section> -->
 
     </main>
   </div>
+
+</body>
 
 </html>
