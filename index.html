@@ -104,6 +104,7 @@
 
     function onHashUrl(func) {
       let data = location.hash.substring(1).split('&').map(m => ({ prop: m.split('=')[0], value: m.split('=')[1] })).filter(m => !!m.value);
+      location.hash = '';
 
       func(data);
     }
