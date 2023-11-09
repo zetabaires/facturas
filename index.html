@@ -8,6 +8,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="facturas/assets/jquery.min.js"></script>
   <script>
+    Date.prototype.addDays = function (days) {
+      var date = new Date(this.valueOf());
+      date.setDate(date.getDate() + days);
+      return date;
+    }
+
     // let key = "002ca967329c859e62cdb71049066ee2";
     let key = "14ce07b3203f16ca21f9de6965e3b577";
     // let trelloCardId = "NWU0MTY5ZTc0NjNhYmIxNmY5NGUyYjYz";
@@ -38,6 +44,45 @@
       })
     }
 
+    function CardTrelloRepository(key, token) {
+
+      const _key = key;
+      const _token = token;
+      const _url = 'https://api.trello.com/1/';
+
+      this.get = async (id) => {
+        return _get(_url + 'cards/' + id).then(m => JSON.parse(m.desc || '{}'));
+      }
+
+      this.update = async (id, data) => {
+        return _put(_url + 'cards/' + id, { desc: JSON.stringify(data) })
+      }
+
+      async function _get(url) {
+        const _url = _getUrl(url);
+
+        return new Promise((resolver, error) => {
+          $.get(_url, data => {
+            resolver(data);
+          })
+        });
+      }
+
+      async function _put(url, body) {
+        const _url = _getUrl(url);
+
+        return new Promise((resolver, error) => {
+          $.put(_url, body, data => {
+            resolver(data);
+          })
+        });
+      }
+
+      function _getUrl(url) {
+        return url + `?key=${_key}&token=${atob(_token)}`;
+      }
+    }
+
     function addDays(date, days) {
       return new Date(new Date(date).setDate(date.getDate() + days))
     }
@@ -48,6 +93,11 @@
 
     function toPage(view, page) {
       view.scrollTo(view.clientWidth * (page - 1), 0);
+    }
+
+    function checkBetween(d1, d2, d2compare) {
+      let compare = d2compare >= d1 && d2compare <= d2;
+      return compare;
     }
 
     const pageRepository = new PageRepository();
@@ -62,7 +112,24 @@
       setPlaceholderData(trelloCardId, '.facturas');
 
       // Setea los valores para la página de guardia
-      setPlaceholderData(trelloCardGuardiaId, '.guardia', 2, d => 'Hasta el ' + d);
+      let repo = new CardTrelloRepository(key, token);
+
+      repo.get(atob(trelloCardGuardiaId)).then(data => {
+
+        data.forEach(m => m.fecha = new Date((new Date()).getFullYear(), Number(m.arranca.split('/')[1]) - 1, m.arranca.split('/')[0]));
+        data.forEach(m => m.hasta = m.fecha.addDays(7));
+        let user = data.find(p => checkBetween(p.fecha, p.hasta, new Date()));
+
+        $('.who', '.guardia').removeClass('waiting');
+        $('.t_name', '.guardia').text(user?.nominado);
+        $('.t_date', '.guardia').text('Hasta el ' + format(user?.hasta));
+
+        function format(d) {
+          if(!d) return null;
+
+          return d.getDate() + '/' + (d.getMonth() + 1);
+        }
+      });
     }
 
     function configuratePages() {
