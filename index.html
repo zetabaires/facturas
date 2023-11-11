@@ -6,442 +6,38 @@
   <title>FacturasApp</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="facturas/assets/page.css" type="text/css" />
   <script src="facturas/assets/jquery.min.js"></script>
+
+  <script src="facturas/src/constants.js"></script>
+  <script src="facturas/src/entities.js"></script>
+  <script src="facturas/src/utils.js"></script>
+  <script src="facturas/src/js/page.plugin.js"></script>
+  <script src="facturas/src/repository/page.repository.js"></script>
+  <script src="facturas/src/repository/card-trello.repository.js"></script>
   <script>
-    Date.prototype.addDays = function (days) {
-      var date = new Date(this.valueOf());
-      date.setDate(date.getDate() + days);
-      return date;
-    }
+    const appWindow = new AppWindow();
+    const pagePlugin = new PagePlugin(appWindow);
 
-    // let key = "002ca967329c859e62cdb71049066ee2";
-    let key = "14ce07b3203f16ca21f9de6965e3b577";
-    // let trelloCardId = "NWU0MTY5ZTc0NjNhYmIxNmY5NGUyYjYz";
-    let trelloCardId = "NjU0M2YxZGIzZWE5NzA5NmU5NTNmY2Zk";
-    let trelloCardGuardiaId = 'NjU0YTRmNjkxMWM2NjhmYmQ1ZDEyZDFj';
-    let trelloCardLicenciasId = 'NjU0YzIzMTcxNjBkMDhmMGFmYmY1Yjhl';
-    // let token = "ZmUxNjNhMjQ4ZTBhZjA3ZWM0MDcxNWUwMWY0YzNkOWMwNWE5NmRkNjhiYzUwOWQwMzNmNmFmYjUzM2ZiMGE1NQ==";
-    let token = "QVRUQTQxM2MwM2Y2OTQ4NjQwYzNiZjMzNzVmMWJhODc2NTk5MWM5ZWNjMjI5NjZmZDEwZjRiNjVkOWNmMjVhOWMxNjcwNzkzREQ5OA==";
+    const currenPageRepository = new CurrentPageRepository();
+    const cardRepository = new CardTrelloRepository(key, token);
 
-    function setPlaceholderData(id, placeholder, extra, mapper) {
-      mapper = mapper || (m => m);
-      let urlCard = `https://api.trello.com/1/cards/${atob(id)}/checklists?key=${key}&token=${atob(token)}`;
+    // Cuando cambie de página actualiza en el repo
+    appWindow.attach(new Event('onSetActivePageAfter', p =>
+      currenPageRepository.changePage(p.number)));
 
-      $.get(urlCard, function (data) {
-        let card = data[0];
-
-        let date = addDays(new Date(), 6 - new Date().getDay() - 1 + (extra || 0));
-        let count = 0;
-
-        let t_data = card.checkItems.filter(m => m.state != 'complete').sort((m, n) => m.pos - n.pos).map(m => m.name).map(m => ({ name: m, date: toString(addDays(date, 7 * (count++))) }));
-
-        let first = t_data[0];
-        let t_name = first.name;
-        let t_date = first.date;
-
-        $('.who', placeholder).removeClass('waiting');
-        $('.t_name', placeholder).text(t_name);
-        $('.t_date', placeholder).text(mapper(t_date));
-      })
-    }
-
-    function CardTrelloRepository(key, token) {
-
-      const _key = key;
-      const _token = token;
-      const _url = 'https://api.trello.com/1/';
-
-      this.get = async (id) => {
-        return _get(_url + 'cards/' + id).then(m => JSON.parse(m.desc || '{}'));
-      }
-
-      this.update = async (id, data) => {
-        return _put(_url + 'cards/' + id, { desc: JSON.stringify(data) })
-      }
-
-      async function _get(url) {
-        const _url = _getUrl(url);
-
-        return new Promise((resolver, error) => {
-          $.get(_url, data => {
-            resolver(data);
-          })
-        });
-      }
-
-      async function _put(url, body) {
-        const _url = _getUrl(url);
-
-        return new Promise((resolver, error) => {
-          $.put(_url, body, data => {
-            resolver(data);
-          })
-        });
-      }
-
-      function _getUrl(url) {
-        return url + `?key=${_key}&token=${atob(_token)}`;
-      }
-    }
-
-    function addDays(date, days) {
-      return new Date(new Date(date).setDate(date.getDate() + days))
-    }
-
-    function toString(date) {
-      return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`
-    }
-
-    function toPage(view, page) {
-      view.scrollTo(view.clientWidth * (page - 1), 0);
-    }
-
-    function checkBetween(d1, d2, d2compare) {
-      let compare = d2compare >= d1 && d2compare <= d2;
-      return compare;
-    }
-
-    const pageRepository = new PageRepository();
+    // Setea la página activa a partir del repo
+    appWindow.setActivePageNumber(currenPageRepository.getCurrentPage());
 
     $(function () {
-      configurateData();
-      configuratePages()
-    });
-
-    function configurateData() {
-      // Setea los valores para la página de facturas
-      setPlaceholderData(trelloCardId, '.facturas');
-
-      let repo = new CardTrelloRepository(key, token);
-
-      // Setea los valores para la página de guardia
-      repo.get(atob(trelloCardGuardiaId)).then(data => {
-
-        data.forEach(m => m.fecha = new Date((new Date()).getFullYear(), Number(m.arranca.split('/')[1]) - 1, m.arranca.split('/')[0]));
-        data.forEach(m => m.hasta = m.fecha.addDays(7));
-        let user = data.find(p => checkBetween(p.fecha, p.hasta, new Date()));
-
-        $('.who', '.guardia').removeClass('waiting');
-        $('.t_name', '.guardia').text(user?.nominado);
-        $('.t_date', '.guardia').text('Hasta el ' + format(user?.hasta));
-
-        function format(d) {
-          if (!d) return null;
-
-          return d.getDate() + '/' + (d.getMonth() + 1);
-        }
-      });
-
-      // Setea los valores para la página de licencias
-      repo.get(atob(trelloCardLicenciasId)).then(data => {
-
-        data.forEach(m => m.fecha = new Date(20 + m.date.split('/')[2], Number(m.date.split('/')[1]) - 1, m.date.split('/')[0]));
-        let user = data
-          .filter(m => m.fecha.getTime() > (new Date()).getTime())
-          .sort((p1, p2) => {
-            if (p1.fecha.getTime() < p2.fecha.getTime()) return -1;
-            if (p1.fecha.getTime() > p2.fecha.getTime()) return 1;
-            return 0
-          })[0];
-
-        $('.who', '.licencias').removeClass('waiting');
-        $('.t_name', '.licencias').text(user?.name);
-        $('.t_date', '.licencias').text('El ' + format(user?.fecha));
-        $('.t_reason', '.licencias').text('Por ' + user?.type);
-
-        function format(d) {
-          if (!d) return null;
-
-          return d.getDate() + '/' + (d.getMonth() + 1);
-        }
-      });
-    }
-
-    function configuratePages() {
-      const view = document.querySelector('#swipe_view');
-
-      // Cuando se cambie la página, agrega valores auxiliares para los estilos
-      pageRepository.addInterceptor('changePage', 'after', (page) => {
-        let total = Math.ceil(view.scrollWidth / view.clientWidth);
-        $(view)
-          .attr('data-page', page)
-          .attr('data-total-pages', total)
-          .attr('data-is-first', page == 1)
-          .attr('data-is-last', page == total);
-      });
-
-      // Se ejecuta cuando se de click a las flechas
-      onArrowChanged(view, (direction) =>
-        toPage(view, pageRepository.getPage() + (direction == 'left' ? -1 : 1)))
-
-      // Se ejecuta durante el scroll de la pantalla
-      onPageChanged(view, (page) =>
-        pageRepository.changePage(page))
-
-      onHashUrl(data => {
-        let page = pageRepository.getPage();
-
-        let urlPage = data.find(m => m.prop == 'page');
-        if (urlPage) {
-          console.log('url page:', urlPage.value)
-          let pageNumber = $(`[data-page=${urlPage.value}]`).data('page-number');
-          console.log('url page number:', pageNumber)
-          page = Number(pageNumber);
-        };
-
-        // Cambia a la página especificada
-        toPage(view, page);
-      })
-    }
-
-    function onHashUrl(func) {
-      let data = location.hash.substring(1).split('&').map(m => ({ prop: m.split('=')[0], value: m.split('=')[1] })).filter(m => !!m.value);
-      location.hash = '';
-
-      func(data);
-    }
-
-    function onPageChanged(view, func) {
-      view.onscrollend = (e) => {
-        let page = Math.ceil(view.scrollLeft / view.clientWidth) + 1;
-        console.log('page:', page, 'left:', view.scrollLeft, 'width:', view.clientWidth);
-
-        func(page);
-      }
-    }
-
-    function onArrowChanged(view, func) {
-      $('.arrow', view).on('click', function (e) {
-        const direction = $(this).data('direction');
-
-        func(direction);
-      });
-    }
-
-    function PageRepository() {
-      const $this = this;
-      $this.interceptors = [];
-
-      $this.changePage = (page) => {
-        excecProcess(
-          'changePage',
-          () => {
-            localStorage.setItem('current_page', page);
-            return page;
-          },
-          page)
-      }
-
-      $this.getPage = () => {
-        return excecProcess('getPage', () => Number(localStorage.getItem('current_page') || 0))
-      }
-
-      $this.addInterceptor = (process, type, func) => {
-        $this.interceptors.push(new Interceptor(process, type, func));
-      }
-
-      function excecProcess(process, func, ...paramArguments) {
-        getInterceptors(process, 'before').forEach(m => m.excec(paramArguments));
-
-        let result = func();
-
-        getInterceptors(process, 'after').forEach(m => m.excec(result));
-
-        return result;
-      }
-
-      function getInterceptors(process, type) {
-        return $this.interceptors.filter(m => m.process == process && (!type || m.type == type));
-      }
-    }
-
-    function Interceptor(process, type, func) {
-      this.process = process;
-      this.type = type;
-      this.func = func;
-
-      this.excec = (...args) => func(...args);
-    }
-
+      // Inicializa el efecto de las páginas
+      pagePlugin.init('#swipe_view', 'section[data-page]')
+    })
   </script>
 </head>
 
 <body>
-  <style>
-    body {
-      font-size: 14px;
-      color: #fff;
-      box-sizing: border-box;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    p {
-      margin: 0;
-    }
-
-    .spacer {
-      flex: 1;
-    }
-
-    a,
-    a:visited,
-    a:hover {
-      color: #1976d2;
-      text-decoration: none;
-    }
-
-    a:hover {
-      color: #125699;
-    }
-
-    body {
-      font-family: Bakery;
-      margin: 0;
-    }
-
-    .background:after {
-      position: absolute;
-      z-index: -100;
-      width: 100%;
-      height: 100%;
-      display: block;
-      left: 0;
-      top: 0;
-      content: "";
-      background: rgba(0, 0, 0, .5);
-    }
-
-    .facturas:after {
-      background: url('facturas/assets/facturas.jpg') no-repeat;
-    }
-
-    .guardia:after {
-      background: url('https://www.lystloc.com/blog/wp-content/uploads/2022/12/ezgif.com-gif-maker-62.webp') no-repeat;
-      background-size: cover;
-      background-position: center;
-    }
-
-    .licencias:after {
-      background: url('https://i.pinimg.com/236x/e4/f4/03/e4f403bb8fba8d2819d38a557f031294.jpg') no-repeat;
-      background-size: cover;
-      background-position: center;
-    }
-
-    h1 {
-      font-size: 5em;
-      margin: 0;
-    }
-
-    h1+p {
-      font-size: 3.5em;
-    }
-
-    h2 {
-      font-size: 3em;
-      color: white;
-      margin: 0;
-    }
-
-    .who {
-      background: rgba(0, 0, 0, .3);
-    }
-
-    .who.waiting {
-      background-image: url('facturas/assets/source.gif');
-      background-size: 100%;
-    }
-
-    @font-face {
-      font-family: "Bakery";
-      src: url("facturas/assets/fonts/bakery.otf");
-    }
-
-    .mobile {
-      width: 100%;
-      height: 100vh;
-      margin: 0 auto;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      text-align: center;
-    }
-
-    .swipe-view {
-      overflow-x: auto;
-      overflow-y: hidden;
-      scroll-snap-coordinate: 0 0;
-      scroll-snap-points-x: repeat(100%);
-      scroll-snap-type: x mandatory;
-      flex: 1;
-      display: flex;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .swipe-view section {
-      height: 100%;
-      flex: 0 0 100%;
-      scroll-snap-align: start;
-      position: relative;
-      background-size: cover;
-      background-position: center;
-    }
-
-    section .content {
-      position: absolute;
-      top: calc(50% - 60px);
-      width: 100%;
-    }
-
-    #arrows {
-
-      /* width: 90%;
-      left: 5%; */
-    }
-
-    #arrows .arrow {
-      position: fixed;
-      top: 30%;
-      z-index: 9999;
-    }
-
-    #arrows img {
-      height: 45px;
-      opacity: .6;
-    }
-
-    #arrows img:hover {
-      cursor: pointer;
-    }
-
-    #arrows .left {
-      /* float: left; */
-      left: 5%;
-    }
-
-    #arrows .right {
-      right: 5%;
-    }
-
-    [data-is-first=true] .left {
-      display: none;
-    }
-
-    [data-is-last=true] .right {
-      display: none;
-    }
-
-    legend {
-      position: fixed;
-      bottom: 0;
-      width: 100%;
-      text-align: center;
-      font-size: 24px;
-    }
-  </style>
-
   <div class="mobile" role="main">
-
     <main class="swipe-view" id="swipe_view">
 
       <div id="arrows">
@@ -525,7 +121,7 @@
 
       <section class="guardia background" data-page="guardia" data-page-number="2">
         <div class="title">
-          <img src="https://cdn-icons-png.flaticon.com/512/308/308045.png" alt="gorra" height="101.678" />
+          <img src="facturas/assets/img/308045.png" alt="gorra" height="101.678" />
           <h2 style="text-align: center">
             Quién esta de guardia (GIN)?
           </h2>
@@ -540,7 +136,7 @@
 
       <section class="licencias background" data-page="licencias" data-page-number="3">
         <div class="title">
-          <img src="https://cdn-icons-png.flaticon.com/512/3127/3127378.png" alt="boleto" height="101.678" />
+          <img src="facturas/assets/img/3127378.png" alt="boleto" height="101.678" />
           <h2 style="text-align: center">
             Próxima licencia
           </h2>
@@ -554,6 +150,24 @@
         </div>
       </section>
 
+      <section class="random background" data-page="random" data-page-number="4">
+        <div class="title">
+          <img src="facturas/assets/img/admin-ajax.png" alt="random" height="101.678" />
+          <h2 style="text-align: center">
+            Random
+          </h2>
+        </div>
+        <div class="content">
+          <button class="button" onclick="newRandom()">
+            <img src="facturas/assets/img/button-155539_960_720.webp" height="140" />
+          </button>
+          <div class="who waiting">
+            <p class="t_last"></p>
+            <h1 class="t_name"></h1>
+          </div>
+        </div>
+      </section>
+
       <legend>
         <span class="left">←</span>
         Podes scrollear para los costados
@@ -561,6 +175,21 @@
       </legend>
     </main>
   </div>
+
+  <script src="facturas/src/js/pages/facturas.js"></script>
+  <script src="facturas/src/js/pages/guardia.js"></script>
+  <script src="facturas/src/js/pages/licencias.js"></script>
+  <script src="facturas/src/js/pages/random.js"></script>
+  <script>
+    // Setea los valores para la página de facturas
+    configurateFacturas();
+
+    // Setea los valores para la página de guardia
+    configurateGaurdia()
+
+    // Setea los valores para la página de licencias
+    configurateLicencias();
+  </script>
 
 </body>
 
