@@ -1,9 +1,10 @@
 function configurateLicencias() {
     cardRepository.get(atob(trelloCardLicenciasId)).then(data => {
-
+        const TODAY = (new Date()).setHours(0, 0, 0, 0);
+        
         data.forEach(m => m.fecha = new Date(20 + m.date.split('/')[2], Number(m.date.split('/')[1]) - 1, m.date.split('/')[0]));
         let user = data
-            .filter(m => m.fecha.getTime() > (new Date()).getTime())
+            .filter(m => m.fecha.getTime() >= TODAY)
             .sort((p1, p2) => {
                 if (p1.fecha.getTime() < p2.fecha.getTime()) return -1;
                 if (p1.fecha.getTime() > p2.fecha.getTime()) return 1;

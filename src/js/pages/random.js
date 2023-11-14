@@ -60,19 +60,18 @@ async function newRandom() {
     let integrantes = await pIntegrantes;
     let random = await pRandom;
 
-    let filter = integrantes
-        .filter(m => m.toLowerCase() != random?.lastSelected?.toLowerCase());
+    let lastSelected = random.selected;
+    let selected = lastSelected;
+    while(selected == lastSelected) {
+        let index = getRandomInt(integrantes.length);
+        selected = integrantes[index];
+    }
 
-    let index = getRandomInt(filter.length);
-
-    let newAssign = filter[index];
-
-    random.lastSelected = random.selected;
-    random.selected = newAssign;
-
-    await cardRepository.update(atob(trelloCardRandomId), random);
+    random.lastSelected = lastSelected;
+    random.selected = selected;
 
     refreshRandomPage(random, '');
+    await cardRepository.update(atob(trelloCardRandomId), random);
 
     lock = false;
 }
